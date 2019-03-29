@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <title>Sign In with Auth0</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bs-stepper/dist/css/bs-stepper.min.css">
+  <style>
+    body, html {
+      height: 100%;
+      background-color: #ffffff;
+    }
+
+    .login-container {
+      position: relative;
+      height: 100%;
+    }
+
+    .login-box {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 15px;
+      background-color: #fff;
+      /* box-shadow: 0px 5px 5px #ccc;
+      border-radius: 5px;
+      border-top: 1px solid #e9e9e9; */
+    }
+
+    .login-header {
+      text-align: center;
+    }
+
+    .login-header img {
+      padding-top: 10%;
+      padding-bottom: 10%; 
+      width: 50%;
+    }
+    .active .bs-stepper-circle {
+      background-color: #009844;
+    }
+    .bs-stepper .step-trigger.disabled, .bs-stepper .step-trigger:disabled {
+      opacity: 1;
+    }
+    .bs-stepper .step-trigger {
+      padding: 0px;
+    }
+
+    .bs-stepper .line, .bs-stepper-line {
+      flex: 0.05 0 0px;
+      margin: 0px;
+    }
+
+    .bs-stepper-header {
+      justify-content: center;
+    }
+
+    .container-body {
+      width: 60%;
+      margin: auto;
+    }
+
+    .btn-block {
+      background-color: #009844;
+      color: white;
+    }
+    .btn-block:hover {
+      background-color: #006937;
+      color: white;
+    }
+
+    .login-part {
+      margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+
+  <!--[if IE 8]>
+  <script src="//cdnjs.cloudflare.com/ajax/libs/ie8/0.2.5/ie8.js"></script>
+  <![endif]-->
+
+  <!--[if lte IE 9]>
+  <script src="https://cdn.auth0.com/js/base64.js"></script>
+  <script src="https://cdn.auth0.com/js/es5-shim.min.js"></script>
+  <![endif]-->
+  <!--stepper-->
+  <div class="login-container">
+    
+    <div class="col-xs-12 col-sm-4 col-sm-offset-4 login-box">
+      <div class="container-body">
+        <div class="login-header">
+          <img src="https://www.qlik.com/us/-/media/images/qlik/global/qlik-logo-2x.png?h=94&w=308"/>
+        </div>
+        <!--stepper-->
+        <div class="bs-stepper">
+          <div class="bs-stepper-header" role="tablist">
+            <!-- your steps here -->
+            <div class="step" data-target="#logins-part">
+              <button type="button" class="step-trigger disabled" role="tab" aria-controls="logins-part" id="logins-part-trigger">
+                <span class="bs-stepper-circle">1</span>
+              </button>
+            </div>
+            <div class="line"></div>
+            <div class="step" data-target="#information-part">
+              <button type="button" class="step-trigger" role="tab" aria-controls="information-part" id="information-part-trigger">
+                <span class="bs-stepper-circle">2</span>
+              </button>
+            </div>
+          </div>
+          <div class="bs-stepper-content">
+            <!-- your steps content here -->
+            <div id="logins-part" class="content login-part" role="tabpanel" aria-labelledby="logins-part-trigger">
+              <div id="setpassword-group">
+                  <b>Set your password here</b>
+                  <p>
+                    Password must be atleast 8 characters and contain at least one letter and one number. Passwords are case sensitive.
+                  </p>
+              </div>
+              <div id="lock-container"></div>
+            </div>
+            <div id="information-part" class="content" role="tabpanel" aria-labelledby="information-part-trigger"></div>
+          </div>
+        </div>
+        <!-- stepper-->
+    </div>
+  </div>
+</div>
+  <script src="https://cdn.auth0.com/js/lock/11.11/lock.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/bs-stepper/dist/js/bs-stepper.min.js"></script>
+  <script>
+    let allowSignUp;
+    let allowLogin;
+    let allowForgotPassword;
+    let initialScreen;
+    let email;
+
+    document.addEventListener('DOMContentLoaded', function () {
+      var stepper = new Stepper(document.querySelector('.bs-stepper'))
+      
+      let queryParams = (new URL(document.location)).searchParams;
+      let action = queryParams.get('action');
+
+      let loginElements = [
+      ];
+
+      let signupElements = [
+        document.getElementById('setpassword-group')
+      ];
+
+      switch (action) {
+        case 'signup':
+          allowSignUp = true;
+          allowLogin = false;
+          allowForgotPassword = false;
+          //loginElements.forEach ( (ele) => ele.classList.add ('hidden') )
+          signupElements.forEach ( (ele) => ele.classList.remove ('hidden') )
+          handleSignUp (configAuth0);
+          break;
+        case 'reset':
+          allowSignUp = false;
+          allowLogin = true;
+          allowForgotPassword = true;
+          signupElements.forEach ( (ele) => ele.classList.add ('hidden') );
+          initialScreen = 'forgotPassword';
+          configAuth0 ();
+          break;
+        default:
+          allowSignUp = false;
+          allowLogin = true;
+          allowForgotPassword = false;
+          //loginElements.forEach ( (ele) => ele.classList.remove ('hidden') )
+          signupElements.forEach ( (ele) => ele.classList.add ('hidden') )
+          configAuth0 ();
+      }
+    })
+
+    handleSignUp = (cb) => {
+      let accessToken = parseParms (document.location.hash).access_token;
+      var data = null;
+
+      var xhr = new XMLHttpRequest();
+      xhr.withCredentials = true;
+
+      xhr.addEventListener("readystatechange", function () {
+        if (this.readyState === 4) {
+          try {
+            email = JSON.parse(this.responseText).email;
+          } catch (e) {}
+          if (cb) cb ();
+        }
+      });
+
+      xhr.open("GET", `${location.protocol}//${location.host}/userinfo`);
+      xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
+      xhr.setRequestHeader("Cache-Control", "no-cache");
+
+      xhr.send();
+    }
+
+    configAuth0 = () => {
+        // Decode utf8 characters properly
+        var config = JSON.parse(decodeURIComponent(escape(window.atob('@@config@@'))));
+        config.extraParams = config.extraParams || {};
+        var connection = config.connection;
+        var prompt = config.prompt;
+        var languageDictionary;
+        var language;
+
+        if (config.dict && config.dict.signin && config.dict.signin.title) {
+          languageDictionary = { title: config.dict.signin.title };
+        }
+        language = getLocale ();
+        var loginHint = config.extraParams.login_hint;
+        var colors = config.colors || {};
+
+        // Available Lock configuration options: https://auth0.com/docs/libraries/lock/v11/configuration
+        var lock = new Auth0Lock(config.clientID, config.auth0Domain, {
+        auth: {
+            redirectUrl: config.callbackURL,
+            responseType: (config.internalOptions || {}).response_type ||
+            (config.callbackOnLocationHash ? 'token' : 'code'),
+            params: config.internalOptions
+        },
+        /* additional configuration needed for custom domains
+        configurationBaseUrl: config.clientConfigurationBaseUrl,
+        overrides: {
+            __tenant: config.auth0Tenant,
+            __token_issuer: 'YOUR_CUSTOM_DOMAIN'
+        }, */
+        assetsUrl:  config.assetsUrl,
+        allowedConnections: connection ? [connection] : null,
+        rememberLastLogin: !prompt,
+        language: language,
+        languageDictionary: languageDictionary,
+        theme: {
+            //logo:            'YOUR LOGO HERE',
+            primaryColor:    colors.primary ? colors.primary : 'green'
+        },
+        prefill: email ? { email: email } : (loginHint ? { email: loginHint, username: loginHint } : null),
+        closable: false,
+        defaultADUsernameFromEmailPrefix: false,
+        // uncomment if you want small buttons for social providers
+        // socialButtonStyle: 'small'
+        container: 'lock-container',
+        allowSignUp: allowSignUp,
+        allowForgotPassword: allowForgotPassword,
+        allowLogin: allowLogin,
+        initialScreen: initialScreen ? initialScreen : 'login'
+        });
+
+        if(colors.page_background) {
+        var css = '.auth0-lock.auth0-lock .auth0-lock-overlay { background: ' +
+                    colors.page_background +
+                    ' } .auth0-lock.auth0-lock .auth0-lock-content { padding: 20px 0px 20px 0px }';
+        var style = document.createElement('style');
+
+        style.appendChild(document.createTextNode(css));
+
+        document.body.appendChild(style);
+        }
+
+        lock.show();
+
+        document.querySelector ('.auth0-lock-header').classList.add ('hidden')
+    }
+
+    var getLocale = function(){
+        
+        var supportedLang = 'en,sv,de,es,fr,it,ja,nl,pt,ru,zh,ko,pl,tr,zh-tw,pt-br';
+        var lang = (navigator.languages && navigator.languages.length) ? navigator.languages[0] : navigator.userLanguage || navigator.language || navigator.browserLanguage || 'en';
+
+        if(lang != null && lang != 'undefined' && lang != undefined ) {
+            lang = lang.match(/[a-zA-z\-]{2,10}/g) || [];
+
+            for(var i=0; i<lang.length; i++) {
+                if(lang[i].length > 2) {
+                    if(supportedLang.indexOf(lang[i].substring(0,5).toLowerCase()) > -1) {
+                        return lang[i].substring(0,5).toLowerCase();
+                        break;
+                    } else if(lang[i].substring(0,2).toLowerCase() == 'zh'){
+                        return getChineseLocale(lang[i].toLowerCase());
+                        break;
+                    }
+                }
+                if(supportedLang.indexOf(lang[i].substring(0,2).toLowerCase()) > -1) {
+                    return lang[i].substring(0,2).toLowerCase ();
+                    break;
+                } else{
+                    return 'en';
+                    break;
+                }
+            }
+        } else {
+            return 'en';
+        }
+
+    }
+
+    parseParms = (str) => {
+	    str = str.replace(/^#?\/?/, '');
+      var pieces = str.split("&"), data = {}, i, parts;
+      // process each query pair
+      for (i = 0; i < pieces.length; i++) {
+          parts = pieces[i].split("=");
+          if (parts.length < 2) {
+              parts.push("");
+          }
+          data[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1]);
+      }
+      return data;
+    }
+  </script>
+  
+</body>
+</html>
